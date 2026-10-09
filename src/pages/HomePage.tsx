@@ -12,10 +12,8 @@ export function HomePage() {
 
   const quotes = data?.quotes ?? {};
   const usAi = themes?.boards.usAi;
-  const usAuto = themes?.boards.usAuto;
   const usSpace = themes?.boards.usSpace;
   const twAi = themes?.boards.twAi;
-  const twAuto = themes?.boards.twAuto;
   const twSpace = themes?.boards.twSpace;
   const strict = (themes?.highlights ?? []).filter(
     (row) => row.kdId === "strong" || row.kdId === "oversold",
@@ -28,7 +26,7 @@ export function HomePage() {
         <div>
           <h1>美股／台股 題材 KD 超跌榜</h1>
           <p className="lede">
-            AI、車電、太空題材池 + KD(9,3,3)。K&lt;20 或 D&lt;20 視為嚴格超跌。不含 A 股。
+            AI、太空題材池 + KD(9,3,3)。K&lt;20 或 D&lt;20 視為嚴格超跌。不含 A 股。
           </p>
         </div>
         <div className="meta">
@@ -45,19 +43,9 @@ export function HomePage() {
           <div className="price">{themes?.counts.usAi ?? "—"} 檔</div>
         </article>
         <article className="card index-card">
-          <div className="kicker">美股 車電 嚴格超跌</div>
-          <div className="price">{themes?.counts.usAuto ?? "—"} 檔</div>
-        </article>
-        <article className="card index-card">
           <div className="kicker">台股 AI 嚴格超跌</div>
           <div className="price">{themes?.counts.twAi ?? "—"} 檔</div>
         </article>
-        <article className="card index-card">
-          <div className="kicker">台股 車電 嚴格超跌</div>
-          <div className="price">{themes?.counts.twAuto ?? "—"} 檔</div>
-        </article>
-      </div>
-      <div className="grid-2">
         <article className="card index-card">
           <div className="kicker">美股 太空 嚴格超跌</div>
           <div className="price">{themes?.counts.usSpace ?? "—"} 檔</div>
@@ -96,10 +84,8 @@ export function HomePage() {
       )}
 
       {usAi && <ThemeTable board={usAi} />}
-      {usAuto && <ThemeTable board={usAuto} />}
       {usSpace && <ThemeTable board={usSpace} />}
       {twAi && <ThemeTable board={twAi} />}
-      {twAuto && <ThemeTable board={twAuto} />}
       {twSpace && <ThemeTable board={twSpace} />}
 
       <p className="note">

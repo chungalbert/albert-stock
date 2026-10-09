@@ -32,8 +32,8 @@ export function MarketPage({ market }: { market: Market }) {
   const quotes = data?.quotes ?? {};
   const themeBoards =
     market === "us"
-      ? [themes?.boards.usAi, themes?.boards.usAuto, themes?.boards.usSpace]
-      : [themes?.boards.twAi, themes?.boards.twAuto, themes?.boards.twSpace];
+      ? [themes?.boards.usAi, themes?.boards.usSpace]
+      : [themes?.boards.twAi, themes?.boards.twSpace];
   const oversold = themeBoards
     .flatMap((item) => item?.rows ?? [])
     .filter((row) => row.kdId === "strong" || row.kdId === "oversold");
@@ -42,11 +42,11 @@ export function MarketPage({ market }: { market: Market }) {
     <section className="page">
       <div className="page-head">
         <div>
-          <h1>{market === "us" ? "美股 AI × 車電 × 太空" : "台股 AI × 車電 × 太空"}</h1>
+          <h1>{market === "us" ? "美股 AI × 太空" : "台股 AI × 太空"}</h1>
           <p className="lede">
             {market === "us"
-              ? "美股 AI、車電與太空題材池，按 KD 超跌排序。"
-              : "台股 AI、車電與太空題材池，按 KD 超跌排序；下方保留證交所當日量價排行。"}
+              ? "美股 AI 與太空題材池，按 KD 超跌排序。"
+              : "台股 AI 與太空題材池，按 KD 超跌排序；下方保留證交所當日量價排行。"}
           </p>
         </div>
         <div className="meta">
