@@ -239,12 +239,16 @@ function rocToIso(roc) {
   return `${year}-${month}-${day}`;
 }
 
+function isTwCode(code) {
+  return /^[0-9]{4,6}[A-Za-z]?$/i.test(String(code));
+}
+
 function isListedStock(code) {
   return /^[0-9]{4}$/.test(code) && !code.startsWith("00");
 }
 
 function isEtf(code) {
-  return /^00[0-9]{2,4}$/.test(code);
+  return isTwCode(code) && String(code).startsWith("00");
 }
 
 function rankRows(rows, key, direction, limit = 20) {
@@ -586,30 +590,47 @@ async function writeTwUniverse() {
   const map = new Map();
   for (const row of Object.values(fundStocks)) {
     const code = String(row.code ?? "");
-    if (!/^[0-9]{4,6}$/.test(code)) continue;
-    map.set(code, {
-      code,
+    if (!isTwCode(code)) continue;
+    map.set(code.toUpperCase(), {
+      code: code.toUpperCase(),
       name: row.name || code,
       market: row.market === "tpex" ? "tpex" : "twse",
       ...(row.industry ? { industry: row.industry } : {}),
     });
   }
   for (const row of extra) {
-    const code = String(row.code ?? "");
-    if (!/^[0-9]{4,6}$/.test(code) || map.has(code)) continue;
+    const code = String(row.code ?? "").toUpperCase();
+    if (!isTwCode(code) || map.has(code)) continue;
     map.set(code, {
       code,
       name: row.name || code,
       market: "twse",
-      ...(code.startsWith("00") || row.kind === "etf" ? { industry: "ETF" } : {}),
+      ...(isEtf(code) || row.kind === "etf" ? { industry: "ETF" } : {}),
     });
+  }
+  try {
+    const dayAll = await fetchJson(
+      "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    );
+    for (const row of dayAll) {
+      const code = String(row.Code ?? "").toUpperCase();
+      if (!isTwCode(code) || map.has(code)) continue;
+      map.set(code, {
+        code,
+        name: row.Name || code,
+        market: "twse",
+        ...(isEtf(code) ? { industry: "ETF" } : {}),
+      });
+    }
+  } catch (error) {
+    console.warn("TW universe day-all failed:", error.message || error);
   }
   try {
     const previous = JSON.parse(await readFile(universeFile, "utf8"));
     for (const row of previous.stocks ?? []) {
-      const code = String(row.code ?? "");
-      if (!/^[0-9]{4,6}$/.test(code) || map.has(code)) continue;
-      map.set(code, row);
+      const code = String(row.code ?? "").toUpperCase();
+      if (!isTwCode(code) || map.has(code)) continue;
+      map.set(code, { ...row, code });
     }
   } catch {
     /* first write */

@@ -36,8 +36,13 @@ export async function loadUniverse(): Promise<TwUniverseFile> {
   return inflight;
 }
 
+export function isTwCode(code: string): boolean {
+  return /^[0-9]{4,6}[A-Za-z]?$/i.test(code.trim());
+}
+
 export function nameToStock(row: TwName): Stock {
   const otc = row.market === "tpex";
+  const etf = row.industry === "ETF" || row.code.startsWith("00");
   return {
     id: `tw-${row.code}`,
     market: "tw",
@@ -46,8 +51,12 @@ export function nameToStock(row: TwName): Stock {
     tv: `${otc ? "TPEX" : "TWSE"}:${row.code}`,
     nameZh: row.name || row.code,
     nameEn: row.name || row.code,
-    sector: row.industry || (otc ? "上櫃" : "上市"),
-    summary: otc ? "櫃買中心上櫃股票。" : "證交所上市股票。",
+    sector: row.industry || (etf ? "ETF" : otc ? "上櫃" : "上市"),
+    summary: etf
+      ? "證交所上市 ETF。"
+      : otc
+        ? "櫃買中心上櫃股票。"
+        : "證交所上市股票。",
   };
 }
 

@@ -3,7 +3,7 @@ import { searchStocks } from "../data/stocks";
 import { searchFundamentals } from "./fundamentals";
 import { searchListed } from "./rankings";
 import { searchThemeRows } from "./themes";
-import { findUniverseName, nameToStock, searchUniverseNames } from "./universe";
+import { findUniverseName, isTwCode, nameToStock, searchUniverseNames } from "./universe";
 import type {
   Stock,
   ThemeBoardsFile,
@@ -24,8 +24,8 @@ function score(stock: Stock, q: string) {
 export function guessTicker(query: string, universe: TwUniverseFile | null = null): Stock | null {
   const raw = query.trim();
   if (!raw) return null;
-  if (/^\d{4,6}$/.test(raw) || /^\d{4,6}\.(TW|TWO)$/i.test(raw)) {
-    const code = raw.replace(/\.(TW|TWO)$/i, "");
+  const code = raw.replace(/\.(TW|TWO)$/i, "").toUpperCase();
+  if (isTwCode(code) && (!raw.includes(".") || /\.(TW|TWO)$/i.test(raw))) {
     const known = findUniverseName(universe, code);
     if (known) return nameToStock(known);
     const otc = /\.TWO$/i.test(raw);
@@ -37,7 +37,7 @@ export function guessTicker(query: string, universe: TwUniverseFile | null = nul
       tv: `${otc ? "TPEX" : "TWSE"}:${code}`,
       nameZh: code,
       nameEn: code,
-      sector: otc ? "上櫃" : "上市",
+      sector: otc ? "上櫃" : code.startsWith("00") ? "ETF" : "上市",
       summary: "以代號帶入的台股庫存。",
     };
   }

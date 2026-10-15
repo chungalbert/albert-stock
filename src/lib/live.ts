@@ -338,8 +338,9 @@ async function refreshTwRankings(): Promise<TwRankingsFile> {
     ];
   });
 
+  const isTwCode = (code: string) => /^[0-9]{4,6}[A-Za-z]?$/i.test(code);
   const isListed = (code: string) => /^[0-9]{4}$/.test(code) && !code.startsWith("00");
-  const isEtf = (code: string) => /^00[0-9]{2}$/.test(code);
+  const isEtf = (code: string) => isTwCode(code) && code.startsWith("00");
   const stocks = mapped.filter((row) => isListed(row.code));
   const etfs = mapped.filter((row) => isEtf(row.code));
   const rank = (rows: TwRankRow[], key: keyof TwRankRow, direction: number) =>
@@ -353,7 +354,7 @@ async function refreshTwRankings(): Promise<TwRankingsFile> {
     updatedAt: new Date().toISOString(),
     sessionDate: rocToIso(lines[1] ? parseCsvLine(lines[1])[0] : ""),
     market: "TWSE",
-    listed: stocks,
+    listed: [...stocks, ...etfs],
     boards: {
       volume: rank(stocks, "volume", -1),
       value: rank(stocks, "value", -1),

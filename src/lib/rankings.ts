@@ -61,7 +61,7 @@ export function findListed(listed: TwRankRow[], code: string): TwRankRow | undef
 }
 
 export function rankToStock(row: TwRankRow): Stock {
-  const etf = row.kind === "etf" || /^00[0-9]{2,4}$/.test(row.code);
+  const etf = row.kind === "etf" || row.code.startsWith("00");
   return {
     id: `tw-${row.code}`,
     market: "tw",
