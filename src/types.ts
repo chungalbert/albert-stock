@@ -35,6 +35,7 @@ export type TwRankRow = {
   rank?: number;
   code: string;
   name: string;
+  kind?: "stock" | "etf";
   close: number;
   change: number;
   changePercent: number;
@@ -151,6 +152,18 @@ export type TwFundamentalsFile = {
   updatedAt: string;
   revenueYm: string;
   stocks: Record<string, TwFundamental>;
+};
+
+export type TwName = {
+  code: string;
+  name: string;
+  market: "twse" | "tpex";
+  industry?: string;
+};
+
+export type TwUniverseFile = {
+  updatedAt: string;
+  stocks: TwName[];
 };
 
 export type RiskCurrency = "TWD" | "USD";

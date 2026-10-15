@@ -1,25 +1,27 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { searchUniverse } from "../lib/search";
-import { useFundamentals, useRankings, useThemeBoards } from "../lib/useData";
+import { useFundamentals, useRankings, useThemeBoards, useUniverse } from "../lib/useData";
+import { venueLabel } from "../lib/universe";
 
 export function SearchBox() {
   const [query, setQuery] = useState("");
   const rankings = useRankings();
   const themes = useThemeBoards();
   const fundamentals = useFundamentals();
+  const universe = useUniverse();
   const navigate = useNavigate();
 
   const results = useMemo(
-    () => searchUniverse(query, themes, rankings, fundamentals, 8),
-    [query, rankings, themes, fundamentals],
+    () => searchUniverse(query, themes, rankings, fundamentals, 8, universe),
+    [query, rankings, themes, fundamentals, universe],
   );
 
   return (
     <div className="search">
       <input
         value={query}
-        placeholder="搜尋代號或名稱，例如 NVDA、中興電、2330"
+        placeholder="搜尋美股或台股上市櫃全市場，例如 NVDA、2330、中興電"
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && results[0]) {
@@ -41,7 +43,7 @@ export function SearchBox() {
               <span>
                 <span className="symbol">{stock.symbol}</span> {stock.nameZh}
               </span>
-              <small className="note">{stock.market === "us" ? "美股" : "台股"}</small>
+              <small className="note">{venueLabel(stock)}</small>
             </Link>
           ))}
         </div>

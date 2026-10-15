@@ -4,11 +4,12 @@ import { ThemeTable } from "../components/ThemeTable";
 import { indices } from "../data/stocks";
 import { formatUpdatedAt } from "../lib/quotes";
 import { namesOf } from "../lib/themes";
-import { useQuotes, useThemeBoards } from "../lib/useData";
+import { useQuotes, useThemeBoards, useUniverse } from "../lib/useData";
 
 export function HomePage() {
   const data = useQuotes();
   const themes = useThemeBoards();
+  const universe = useUniverse();
 
   const quotes = data?.quotes ?? {};
   const usAi = themes?.boards.usAi;
@@ -89,7 +90,10 @@ export function HomePage() {
       {twSpace && <ThemeTable board={twSpace} />}
 
       <p className="note">
-        本站資訊僅供參考，不構成投資建議。太空股的逐家前景在「太空」頁。成交量排行仍在台股頁。研報目標價尚未接入。
+        本站資訊僅供參考，不構成投資建議。太空股的逐家前景在「太空」頁。台股上市櫃全市場名冊（
+        {universe?.stocks.length ?? "—"} 檔）與成交量排行在
+        <Link to="/tw">台股</Link>
+        頁。研報目標價尚未接入。
       </p>
     </section>
   );

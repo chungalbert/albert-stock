@@ -19,7 +19,8 @@ import {
 import { findFundamental, fundToStock } from "../lib/fundamentals";
 import { readWatchlist, toggleWatch } from "../lib/watchlist";
 import { findThemeRow, findThemeRows, themeToStock } from "../lib/themes";
-import { useFundamentals, useQuotes, useRankings, useThemeBoards } from "../lib/useData";
+import { findUniverseName, nameToStock } from "../lib/universe";
+import { useFundamentals, useQuotes, useRankings, useThemeBoards, useUniverse } from "../lib/useData";
 import type { Stock, TwFundamental, TwRankRow } from "../types";
 
 export function StockPage() {
@@ -30,18 +31,21 @@ export function StockPage() {
   const rankings = useRankings();
   const themes = useThemeBoards();
   const fundamentals = useFundamentals();
+  const universe = useUniverse();
   const [watched, setWatched] = useState(false);
 
   const listed = market === "tw" ? findListed(rankings?.listed ?? [], code) : undefined;
   const fund: TwFundamental | undefined =
     market === "tw" ? findFundamental(fundamentals, code) : undefined;
+  const named = market === "tw" ? findUniverseName(universe, code) : undefined;
   const themeRows = findThemeRows(themes, market, code);
   const themeRow = findThemeRow(themes, market, code);
   const outlooks = themeRows.filter((row) => row.outlook);
   const stock: Stock | undefined =
     curated ??
-    (listed ? rankToStock(listed) : undefined) ??
     (fund ? fundToStock(fund) : undefined) ??
+    (named ? nameToStock(named) : undefined) ??
+    (listed ? rankToStock(listed) : undefined) ??
     (themeRow ? themeToStock(themeRow) : undefined);
 
   useEffect(() => {
@@ -50,7 +54,13 @@ export function StockPage() {
   }, [stock?.id]);
 
   if (!stock) {
-    if (market === "tw" && rankings === null && themes === null && fundamentals === null) {
+    if (
+      market === "tw" &&
+      rankings === null &&
+      themes === null &&
+      fundamentals === null &&
+      universe === null
+    ) {
       return (
         <section className="page">
           <p className="lede">載入中…</p>

@@ -3,7 +3,14 @@ import { searchStocks } from "../data/stocks";
 import { searchFundamentals } from "./fundamentals";
 import { searchListed } from "./rankings";
 import { searchThemeRows } from "./themes";
-import type { Stock, ThemeBoardsFile, TwFundamentalsFile, TwRankingsFile } from "../types";
+import { findUniverseName, nameToStock, searchUniverseNames } from "./universe";
+import type {
+  Stock,
+  ThemeBoardsFile,
+  TwFundamentalsFile,
+  TwRankingsFile,
+  TwUniverseFile,
+} from "../types";
 
 function score(stock: Stock, q: string) {
   const symbol = stock.symbol.toLowerCase();
@@ -14,31 +21,19 @@ function score(stock: Stock, q: string) {
   return 2;
 }
 
-export function guessTicker(query: string): Stock | null {
+export function guessTicker(query: string, universe: TwUniverseFile | null = null): Stock | null {
   const raw = query.trim();
   if (!raw) return null;
-  if (/^\d{4}$/.test(raw)) {
-    return {
-      id: `tw-${raw}`,
-      market: "tw",
-      symbol: raw,
-      yahoo: `${raw}.TW`,
-      tv: `TWSE:${raw}`,
-      nameZh: raw,
-      nameEn: raw,
-      sector: "台股",
-      summary: "以代號帶入的台股庫存。",
-    };
-  }
-  const tw = raw.toUpperCase().match(/^(\d{4})\.(TW|TWO)$/);
-  if (tw) {
-    const code = tw[1];
-    const otc = tw[2] === "TWO";
+  if (/^\d{4,6}$/.test(raw) || /^\d{4,6}\.(TW|TWO)$/i.test(raw)) {
+    const code = raw.replace(/\.(TW|TWO)$/i, "");
+    const known = findUniverseName(universe, code);
+    if (known) return nameToStock(known);
+    const otc = /\.TWO$/i.test(raw);
     return {
       id: `tw-${code}`,
       market: "tw",
       symbol: code,
-      yahoo: `${code}.${tw[2]}`,
+      yahoo: `${code}.${otc ? "TWO" : "TW"}`,
       tv: `${otc ? "TPEX" : "TWSE"}:${code}`,
       nameZh: code,
       nameEn: code,
@@ -69,10 +64,11 @@ export function searchUniverse(
   rankings: TwRankingsFile | null,
   fundamentals: TwFundamentalsFile | null,
   limit = 8,
+  universe: TwUniverseFile | null = null,
 ): Stock[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const guessed = guessTicker(query);
+  const guessed = guessTicker(query, universe);
   const pool = [
     ...searchStocks(query, limit),
     ...extraStocks.filter(
@@ -82,6 +78,7 @@ export function searchUniverse(
         item.nameEn.toLowerCase().includes(q),
     ),
     ...searchThemeRows(themes, query, limit),
+    ...searchUniverseNames(universe, query, Math.max(limit, 40)),
     ...searchListed(rankings?.listed ?? [], query, Math.max(limit, 24)),
     ...searchFundamentals(fundamentals, query, Math.max(limit, 24)),
     ...(guessed ? [guessed] : []),

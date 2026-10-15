@@ -6,6 +6,7 @@ import { bootLiveRefresh } from "./lib/live";
 import { loadQuotes } from "./lib/quotes";
 import { loadRankings } from "./lib/rankings";
 import { loadThemeBoards } from "./lib/themes";
+import { loadUniverse } from "./lib/universe";
 import { HomePage } from "./pages/HomePage";
 import { MarketPage } from "./pages/MarketPage";
 import { SpacePage } from "./pages/SpacePage";
@@ -20,6 +21,7 @@ export default function App() {
       loadThemeBoards(),
       loadRankings(),
       loadFundamentals(),
+      loadUniverse(),
     ]).then(([quotes, themes, , fundamentals]) => {
       void bootLiveRefresh(quotes, themes, fundamentals);
     });

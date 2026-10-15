@@ -372,6 +372,24 @@ code,
   overflow: auto;
 }
 
+.dir-wrap {
+  max-height: 520px;
+}
+
+.dir-search {
+  width: min(420px, 100%);
+  height: 40px;
+  margin: 0 0 12px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  outline: none;
+}
+
+.dir-search:focus {
+  border-color: var(--gold);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

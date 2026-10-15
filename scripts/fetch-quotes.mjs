@@ -6,6 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const quotesFile = resolve(root, "public", "quotes.json");
 const rankingsFile = resolve(root, "public", "tw-rankings.json");
 const fundamentalsFile = resolve(root, "public", "tw-fundamentals.json");
+const universeFile = resolve(root, "public", "tw-universe.json");
 const themesFile = resolve(root, "src", "data", "themes.json");
 const themeBoardsFile = resolve(root, "public", "theme-boards.json");
 
@@ -208,6 +209,12 @@ async function main() {
     } catch (error) {
       console.warn("TW fundamentals failed:", error.message || error);
     }
+
+    try {
+      await writeTwUniverse();
+    } catch (error) {
+      console.warn("TW universe failed:", error.message || error);
+    }
   }
 
   try {
@@ -237,7 +244,7 @@ function isListedStock(code) {
 }
 
 function isEtf(code) {
-  return /^00[0-9]{2}$/.test(code);
+  return /^00[0-9]{2,4}$/.test(code);
 }
 
 function rankRows(rows, key, direction, limit = 20) {
@@ -267,6 +274,7 @@ async function writeTwRankings() {
       return {
         code: item.Code,
         name: item.Name,
+        kind: isEtf(item.Code) ? "etf" : "stock",
         close,
         change,
         changePercent: previousClose ? (change / previousClose) * 100 : NaN,
@@ -289,7 +297,7 @@ async function writeTwRankings() {
     updatedAt: new Date().toISOString(),
     sessionDate: rocToIso(raw[0]?.Date),
     market: "TWSE",
-    listed: stocks,
+    listed: [...stocks, ...etfs],
     boards: {
       volume: rankRows(stocks, "volume", -1),
       value: rankRows(stocks, "value", -1),
@@ -557,6 +565,70 @@ async function writeTwFundamentals() {
   await writeFile(fundamentalsFile, JSON.stringify(payload));
   console.log(
     `wrote TW fundamentals ${Object.keys(stocks).length} names -> public/tw-fundamentals.json`,
+  );
+}
+
+async function writeTwUniverse() {
+  let fundStocks = {};
+  try {
+    fundStocks = JSON.parse(await readFile(fundamentalsFile, "utf8")).stocks ?? {};
+  } catch {
+    fundStocks = {};
+  }
+  let extra = [];
+  try {
+    const rank = JSON.parse(await readFile(rankingsFile, "utf8"));
+    extra = [...(rank.listed ?? []), ...(rank.boards?.etfVolume ?? [])];
+  } catch {
+    extra = [];
+  }
+
+  const map = new Map();
+  for (const row of Object.values(fundStocks)) {
+    const code = String(row.code ?? "");
+    if (!/^[0-9]{4,6}$/.test(code)) continue;
+    map.set(code, {
+      code,
+      name: row.name || code,
+      market: row.market === "tpex" ? "tpex" : "twse",
+      ...(row.industry ? { industry: row.industry } : {}),
+    });
+  }
+  for (const row of extra) {
+    const code = String(row.code ?? "");
+    if (!/^[0-9]{4,6}$/.test(code) || map.has(code)) continue;
+    map.set(code, {
+      code,
+      name: row.name || code,
+      market: "twse",
+      ...(code.startsWith("00") || row.kind === "etf" ? { industry: "ETF" } : {}),
+    });
+  }
+  try {
+    const previous = JSON.parse(await readFile(universeFile, "utf8"));
+    for (const row of previous.stocks ?? []) {
+      const code = String(row.code ?? "");
+      if (!/^[0-9]{4,6}$/.test(code) || map.has(code)) continue;
+      map.set(code, row);
+    }
+  } catch {
+    /* first write */
+  }
+
+  const stocks = [...map.values()].sort((a, b) =>
+    a.code.localeCompare(b.code, "en", { numeric: true }),
+  );
+  await writeFile(
+    universeFile,
+    JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      stocks,
+    }),
+  );
+  const listedCount = stocks.filter((row) => row.market === "twse").length;
+  const otcCount = stocks.filter((row) => row.market === "tpex").length;
+  console.log(
+    `wrote TW universe ${stocks.length} names (twse ${listedCount}, tpex ${otcCount}) -> public/tw-universe.json`,
   );
 }
 

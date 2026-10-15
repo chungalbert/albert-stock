@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DialGauge, NeedleGauge } from "../components/Gauges";
-import { useFundamentals, useQuotes, useRankings, useThemeBoards } from "../lib/useData";
+import { useFundamentals, useQuotes, useRankings, useThemeBoards, useUniverse } from "../lib/useData";
+import { venueLabel } from "../lib/universe";
 import {
   formatMoney,
   importHoldings,
@@ -70,6 +71,7 @@ export function RiskPage() {
   const themes = useThemeBoards();
   const rankings = useRankings();
   const fundamentals = useFundamentals();
+  const universe = useUniverse();
   const [query, setQuery] = useState("");
   const [shares, setShares] = useState("1000");
   const [showBook, setShowBook] = useState(false);
@@ -88,8 +90,8 @@ export function RiskPage() {
   const signals = useMemo(() => riskSignals(quotes, themes), [quotes, themes]);
   const suggestPct = recommendedAllocation(signals);
   const results = useMemo(
-    () => searchUniverse(query, themes, rankings, fundamentals, 24),
-    [query, themes, rankings, fundamentals],
+    () => searchUniverse(query, themes, rankings, fundamentals, 24, universe),
+    [query, themes, rankings, fundamentals, universe],
   );
 
   const cashTwd = book.twdCash + book.usdCash * fx;
@@ -251,7 +253,7 @@ export function RiskPage() {
           </button>
         </div>
         <p className="lede">
-          可搜台股代號／名稱（上市櫃約兩千檔）或美股 ticker。直接輸入代號也能帶入。輸入股數後點選股票，再按帶入庫存會用最新價重算市值。
+          可搜台股上市櫃全市場（約 {universe?.stocks.length ?? "—"} 檔）或美股 ticker。直接輸入代號也能帶入。輸入股數後點選股票，再按帶入庫存會用最新價重算市值。
         </p>
         {showBook && (
           <>
@@ -280,7 +282,7 @@ export function RiskPage() {
                     <span>
                       <span className="symbol">{stock.symbol}</span> {stock.nameZh}
                     </span>
-                    <small className="note">{stock.market === "us" ? "美股" : "台股"}</small>
+                    <small className="note">{venueLabel(stock)}</small>
                   </button>
                 ))}
               </div>

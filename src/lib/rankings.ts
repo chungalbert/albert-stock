@@ -61,6 +61,7 @@ export function findListed(listed: TwRankRow[], code: string): TwRankRow | undef
 }
 
 export function rankToStock(row: TwRankRow): Stock {
+  const etf = row.kind === "etf" || /^00[0-9]{2,4}$/.test(row.code);
   return {
     id: `tw-${row.code}`,
     market: "tw",
@@ -69,8 +70,8 @@ export function rankToStock(row: TwRankRow): Stock {
     tv: `TWSE:${row.code}`,
     nameZh: row.name,
     nameEn: row.name,
-    sector: "上市",
-    summary: "證交所上市股票，資料來自當日收盤排行。",
+    sector: etf ? "ETF" : "上市",
+    summary: etf ? "證交所上市 ETF，資料來自當日收盤排行。" : "證交所上市股票，資料來自當日收盤排行。",
   };
 }
 
