@@ -164,6 +164,58 @@ export function positionValueTwd(
   return row.market === "tw" ? price * row.shares : price * row.shares * fx;
 }
 
+export function hasCost(row: RiskPosition): boolean {
+  return typeof row.cost === "number" && Number.isFinite(row.cost) && row.cost > 0;
+}
+
+export function positionPnl(
+  row: RiskPosition,
+  quotes: QuotesFile | null,
+  rankings: TwRankingsFile | null,
+  fx: number,
+): { price: number; cost: number; twd: number; pct: number } | null {
+  const price = positionPrice(row, quotes, rankings);
+  if (!price || !hasCost(row)) return null;
+  const cost = row.cost as number;
+  const local = (price - cost) * row.shares;
+  return {
+    price,
+    cost,
+    twd: row.market === "tw" ? local : local * fx,
+    pct: ((price - cost) / cost) * 100,
+  };
+}
+
+export function bookPnlTwd(
+  positions: RiskPosition[],
+  quotes: QuotesFile | null,
+  rankings: TwRankingsFile | null,
+  fx: number,
+): number | null {
+  let total = 0;
+  let counted = 0;
+  for (const row of positions) {
+    const pnl = positionPnl(row, quotes, rankings, fx);
+    if (!pnl) continue;
+    total += pnl.twd;
+    counted += 1;
+  }
+  return counted ? total : null;
+}
+
+export function formatSignedMoney(value: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "—";
+  const abs = formatMoney(Math.abs(value), digits);
+  if (value > 0) return `+${abs}`;
+  if (value < 0) return `-${abs}`;
+  return abs;
+}
+
+export function pnlTone(value?: number | null): string {
+  if (value == null || !Number.isFinite(value) || value === 0) return "chg flat";
+  return value > 0 ? "chg up" : "chg down";
+}
+
 export function importHoldings(
   positions: RiskPosition[],
   quotes: QuotesFile | null,
@@ -180,9 +232,27 @@ export function importHoldings(
   return { twHoldings, usHoldings };
 }
 
-export function upsertPosition(positions: RiskPosition[], stock: Stock, shares: number): RiskPosition[] {
+function mergeCost(existing: RiskPosition | undefined, shares: number, cost?: number): number | undefined {
+  const addCost = typeof cost === "number" && cost > 0 ? cost : 0;
+  const oldCost = existing && hasCost(existing) ? (existing.cost as number) : 0;
+  const oldShares = existing?.shares ?? 0;
+  if (!oldCost && !addCost) return undefined;
+  if (!oldCost) return addCost;
+  if (!addCost) return oldCost;
+  if (oldShares <= 0) return addCost;
+  return (oldShares * oldCost + shares * addCost) / (oldShares + shares);
+}
+
+export function upsertPosition(
+  positions: RiskPosition[],
+  stock: Stock,
+  shares: number,
+  cost?: number,
+): RiskPosition[] {
+  const existing = positions.find((row) => row.id === stock.id);
   const next = positions.filter((row) => row.id !== stock.id);
   if (shares <= 0) return next;
+  const mergedCost = mergeCost(existing, shares, cost);
   return [
     {
       id: stock.id,
@@ -190,10 +260,25 @@ export function upsertPosition(positions: RiskPosition[], stock: Stock, shares: 
       symbol: stock.symbol,
       yahoo: stock.yahoo,
       nameZh: stock.nameZh,
-      shares,
+      shares: existing ? existing.shares + shares : shares,
+      ...(mergedCost != null ? { cost: mergedCost } : {}),
     },
     ...next,
   ];
+}
+
+export function patchPosition(
+  positions: RiskPosition[],
+  id: string,
+  patch: Partial<Pick<RiskPosition, "shares" | "cost">>,
+): RiskPosition[] {
+  return positions.map((row) => {
+    if (row.id !== id) return row;
+    const next = { ...row, ...patch };
+    if (next.shares <= 0) return row;
+    if (next.cost != null && next.cost <= 0) delete next.cost;
+    return next;
+  });
 }
 
 export function nextHourCountdown(now = Date.now()): { m: string; s: string; total: number } {

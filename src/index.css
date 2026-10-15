@@ -1014,9 +1014,31 @@ tbody tr:hover {
 
 .risk-add {
   display: grid;
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: 1fr 110px 130px;
   gap: 8px;
   margin: 14px 0;
+}
+
+.risk-cell-input {
+  width: 88px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: right;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.risk-cell-input:focus {
+  border-color: var(--gold);
+  outline: none;
+}
+
+tfoot td {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .risk-add input,

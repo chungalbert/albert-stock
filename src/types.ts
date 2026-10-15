@@ -175,6 +175,7 @@ export type RiskPosition = {
   yahoo: string;
   nameZh: string;
   shares: number;
+  cost?: number;
 };
 
 export type RiskBook = {

@@ -3,11 +3,17 @@ import { DialGauge, NeedleGauge } from "../components/Gauges";
 import { useFundamentals, useQuotes, useRankings, useThemeBoards, useUniverse } from "../lib/useData";
 import { venueLabel } from "../lib/universe";
 import {
+  bookPnlTwd,
   formatMoney,
+  formatSignedMoney,
   importHoldings,
   maskMoney,
   nextHourCountdown,
   parseMoney,
+  patchPosition,
+  pnlTone,
+  positionPnl,
+  positionPrice,
   positionValueTwd,
   readRiskBook,
   recommendedAllocation,
@@ -17,7 +23,46 @@ import {
   writeRiskBook,
 } from "../lib/risk";
 import { searchUniverse } from "../lib/search";
-import type { RiskBook, Stock } from "../types";
+import type { RiskBook, RiskPosition, Stock } from "../types";
+
+function CompactNum({
+  value,
+  digits = 2,
+  hidden,
+  onChange,
+  ariaLabel,
+}: {
+  value?: number;
+  digits?: number;
+  hidden: boolean;
+  onChange: (value: number) => void;
+  ariaLabel: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(value ? String(value) : "");
+
+  useEffect(() => {
+    if (!focused) setDraft(value ? String(value) : "");
+  }, [value, focused]);
+
+  return (
+    <input
+      className="risk-cell-input"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      value={hidden && !focused ? "••••" : focused ? draft : value ? formatMoney(value, digits) : ""}
+      onFocus={() => {
+        setFocused(true);
+        setDraft(value ? String(value) : "");
+      }}
+      onBlur={() => {
+        setFocused(false);
+        onChange(parseMoney(draft));
+      }}
+      onChange={(event) => setDraft(event.target.value)}
+    />
+  );
+}
 
 function MoneyField({
   label,
@@ -74,6 +119,7 @@ export function RiskPage() {
   const universe = useUniverse();
   const [query, setQuery] = useState("");
   const [shares, setShares] = useState("1000");
+  const [cost, setCost] = useState("");
   const [showBook, setShowBook] = useState(false);
   const [clock, setClock] = useState(() => nextHourCountdown());
 
@@ -109,14 +155,30 @@ export function RiskPage() {
     setBook((prev) => ({ ...prev, ...next }));
   }
 
+  const totalPnl = useMemo(
+    () => bookPnlTwd(book.positions, quotes, rankings, fx),
+    [book.positions, quotes, rankings, fx],
+  );
+
   function addStock(stock: Stock) {
     const qty = parseMoney(shares);
     if (qty <= 0) return;
-    const positions = upsertPosition(book.positions, stock, qty);
+    const avg = parseMoney(cost);
+    const positions = upsertPosition(book.positions, stock, qty, avg > 0 ? avg : undefined);
     const imported = importHoldings(positions, quotes, rankings, fx);
     setBook({ ...book, positions, ...imported });
     setQuery("");
+    setCost("");
     setShowBook(true);
+  }
+
+  function updateRow(id: string, patch: Partial<Pick<RiskPosition, "shares" | "cost">>) {
+    const positions = patchPosition(book.positions, id, patch);
+    setBook({
+      ...book,
+      positions,
+      ...importHoldings(positions, quotes, rankings, fx),
+    });
   }
 
   function applyBook() {
@@ -253,7 +315,7 @@ export function RiskPage() {
           </button>
         </div>
         <p className="lede">
-          可搜台股上市櫃全市場（約 {universe?.stocks.length ?? "—"} 檔）或美股 ticker。直接輸入代號也能帶入。輸入股數後點選股票，再按帶入庫存會用最新價重算市值。
+          可搜台股上市櫃全市場（約 {universe?.stocks.length ?? "—"} 檔）或美股 ticker。輸入股數與成本均價後點選股票；同一檔再加碼會依股數加權重算均價。帶入庫存會用最新價重算市值與未實現損益。
         </p>
         {showBook && (
           <>
@@ -272,6 +334,15 @@ export function RiskPage() {
                 value={shares}
                 onChange={(event) => setShares(event.target.value)}
                 aria-label="股數"
+                placeholder="股數"
+              />
+              <input
+                className="risk-shares"
+                inputMode="decimal"
+                value={cost}
+                onChange={(event) => setCost(event.target.value)}
+                aria-label="成本均價"
+                placeholder="成本均價"
               />
             </div>
             {query && (
@@ -296,42 +367,92 @@ export function RiskPage() {
                     <tr>
                       <th>股票</th>
                       <th className="num">股數</th>
+                      <th className="num">成本均價</th>
+                      <th className="num">現價</th>
                       <th className="num">市值（TWD）</th>
+                      <th className="num">損益</th>
+                      <th className="num">報酬</th>
                       <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {book.positions.map((row) => (
-                      <tr key={row.id}>
-                        <td>
-                          {row.nameZh}
-                          <span className="code">{row.symbol}</span>
-                        </td>
-                        <td className="num">{row.shares.toLocaleString("en-US")}</td>
-                        <td className="num">
-                          {maskMoney(
-                            book.hideValues,
-                            formatMoney(positionValueTwd(row, quotes, rankings, fx)),
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            className="btn"
-                            onClick={() => {
-                              const positions = book.positions.filter((item) => item.id !== row.id);
-                              setBook({
-                                ...book,
-                                positions,
-                                ...importHoldings(positions, quotes, rankings, fx),
-                              });
-                            }}
-                          >
-                            移除
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {book.positions.map((row) => {
+                      const price = positionPrice(row, quotes, rankings);
+                      const pnl = positionPnl(row, quotes, rankings, fx);
+                      const unit = row.market === "tw" ? "TWD" : "USD";
+                      return (
+                        <tr key={row.id}>
+                          <td>
+                            {row.nameZh}
+                            <span className="code">{row.symbol}</span>
+                          </td>
+                          <td className="num">
+                            <CompactNum
+                              value={row.shares}
+                              digits={0}
+                              hidden={false}
+                              ariaLabel={`${row.nameZh}股數`}
+                              onChange={(shares) => updateRow(row.id, { shares })}
+                            />
+                          </td>
+                          <td className="num">
+                            <CompactNum
+                              value={row.cost}
+                              hidden={book.hideValues}
+                              ariaLabel={`${row.nameZh}成本均價`}
+                              onChange={(next) => updateRow(row.id, { cost: next })}
+                            />
+                            <span className="code">{unit}</span>
+                          </td>
+                          <td className="num">
+                            {price
+                              ? `${maskMoney(book.hideValues, formatMoney(price, 2))} ${unit}`
+                              : "—"}
+                          </td>
+                          <td className="num">
+                            {maskMoney(
+                              book.hideValues,
+                              formatMoney(positionValueTwd(row, quotes, rankings, fx)),
+                            )}
+                          </td>
+                          <td className={`num ${pnlTone(pnl?.twd)}`}>
+                            {pnl
+                              ? maskMoney(book.hideValues, formatSignedMoney(pnl.twd))
+                              : "—"}
+                          </td>
+                          <td className={`num ${pnlTone(pnl?.pct)}`}>
+                            {pnl ? formatSignedMoney(pnl.pct, 2) + "%" : "—"}
+                          </td>
+                          <td>
+                            <button
+                              className="btn"
+                              onClick={() => {
+                                const positions = book.positions.filter((item) => item.id !== row.id);
+                                setBook({
+                                  ...book,
+                                  positions,
+                                  ...importHoldings(positions, quotes, rankings, fx),
+                                });
+                              }}
+                            >
+                              移除
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
+                  {totalPnl != null && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={5}>未實現損益合計</td>
+                        <td className={`num ${pnlTone(totalPnl)}`}>
+                          {maskMoney(book.hideValues, formatSignedMoney(totalPnl))}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             )}
