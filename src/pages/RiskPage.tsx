@@ -88,7 +88,7 @@ export function RiskPage() {
   const signals = useMemo(() => riskSignals(quotes, themes), [quotes, themes]);
   const suggestPct = recommendedAllocation(signals);
   const results = useMemo(
-    () => searchUniverse(query, themes, rankings, fundamentals, 6),
+    () => searchUniverse(query, themes, rankings, fundamentals, 24),
     [query, themes, rankings, fundamentals],
   );
 
@@ -251,15 +251,18 @@ export function RiskPage() {
           </button>
         </div>
         <p className="lede">
-          搜尋後輸入股數，按帶入庫存會用最新收盤價重算台股／美股市值。美股會先乘匯率再記入台幣。
+          可搜台股代號／名稱（上市櫃約兩千檔）或美股 ticker。直接輸入代號也能帶入。輸入股數後點選股票，再按帶入庫存會用最新價重算市值。
         </p>
         {showBook && (
           <>
             <div className="risk-add">
               <input
                 value={query}
-                placeholder="搜尋代號或名稱，例如 NVDA、中興電"
+                placeholder="搜尋代號或名稱，例如 NVDA、QQQ、2330、中興電"
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && results[0]) addStock(results[0]);
+                }}
               />
               <input
                 className="risk-shares"

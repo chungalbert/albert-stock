@@ -1014,6 +1014,9 @@ tbody tr:hover {
   position: relative;
   top: 0;
   margin-bottom: 12px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--line);
 }
 
 .risk-pick {

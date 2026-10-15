@@ -1,8 +1,67 @@
+import { extraStocks } from "../data/extraUniverse";
 import { searchStocks } from "../data/stocks";
 import { searchFundamentals } from "./fundamentals";
 import { searchListed } from "./rankings";
 import { searchThemeRows } from "./themes";
 import type { Stock, ThemeBoardsFile, TwFundamentalsFile, TwRankingsFile } from "../types";
+
+function score(stock: Stock, q: string) {
+  const symbol = stock.symbol.toLowerCase();
+  const zh = stock.nameZh.toLowerCase();
+  const en = stock.nameEn.toLowerCase();
+  if (symbol === q || zh === q || en === q) return 0;
+  if (symbol.startsWith(q) || zh.startsWith(q) || en.startsWith(q)) return 1;
+  return 2;
+}
+
+export function guessTicker(query: string): Stock | null {
+  const raw = query.trim();
+  if (!raw) return null;
+  if (/^\d{4}$/.test(raw)) {
+    return {
+      id: `tw-${raw}`,
+      market: "tw",
+      symbol: raw,
+      yahoo: `${raw}.TW`,
+      tv: `TWSE:${raw}`,
+      nameZh: raw,
+      nameEn: raw,
+      sector: "台股",
+      summary: "以代號帶入的台股庫存。",
+    };
+  }
+  const tw = raw.toUpperCase().match(/^(\d{4})\.(TW|TWO)$/);
+  if (tw) {
+    const code = tw[1];
+    const otc = tw[2] === "TWO";
+    return {
+      id: `tw-${code}`,
+      market: "tw",
+      symbol: code,
+      yahoo: `${code}.${tw[2]}`,
+      tv: `${otc ? "TPEX" : "TWSE"}:${code}`,
+      nameZh: code,
+      nameEn: code,
+      sector: otc ? "上櫃" : "上市",
+      summary: "以代號帶入的台股庫存。",
+    };
+  }
+  if (/^[A-Za-z][A-Za-z0-9.-]{0,6}$/.test(raw)) {
+    const symbol = raw.toUpperCase();
+    return {
+      id: `us-${symbol.toLowerCase()}`,
+      market: "us",
+      symbol,
+      yahoo: symbol,
+      tv: symbol,
+      nameZh: symbol,
+      nameEn: symbol,
+      sector: "美股",
+      summary: "以代號帶入的美股庫存。",
+    };
+  }
+  return null;
+}
 
 export function searchUniverse(
   query: string,
@@ -11,20 +70,30 @@ export function searchUniverse(
   fundamentals: TwFundamentalsFile | null,
   limit = 8,
 ): Stock[] {
-  const curated = searchStocks(query, limit);
-  const extra = [
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const guessed = guessTicker(query);
+  const pool = [
+    ...searchStocks(query, limit),
+    ...extraStocks.filter(
+      (item) =>
+        item.symbol.toLowerCase().includes(q) ||
+        item.nameZh.toLowerCase().includes(q) ||
+        item.nameEn.toLowerCase().includes(q),
+    ),
     ...searchThemeRows(themes, query, limit),
-    ...searchListed(rankings?.listed ?? [], query, limit),
-    ...searchFundamentals(fundamentals, query, limit),
+    ...searchListed(rankings?.listed ?? [], query, Math.max(limit, 24)),
+    ...searchFundamentals(fundamentals, query, Math.max(limit, 24)),
+    ...(guessed ? [guessed] : []),
   ];
-  const seen = new Set(curated.map((item) => `${item.market}:${item.symbol}`));
-  const merged = [...curated];
-  for (const item of extra) {
-    const key = `${item.market}:${item.symbol}`;
+  const seen = new Set<string>();
+  const merged: Stock[] = [];
+  for (const item of pool.sort((a, b) => score(a, q) - score(b, q))) {
+    const key = `${item.market}:${item.symbol.toUpperCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(item);
     if (merged.length >= limit) break;
   }
-  return merged.slice(0, limit);
+  return merged;
 }
